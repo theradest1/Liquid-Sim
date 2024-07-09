@@ -1,116 +1,62 @@
 import pygame
 import time
 
-rows = 100
-columns = 100
-scale = 5
+class Particle:
+    def __init__(self, x, y):
+        self.xPos = x
+        self.yPos = y
+        self.xVel = 0
+        self.yVel = 0
+    
+    def addVel(self, xVel, yVel):
+        self.xVel += xVel
+        self.yVel += yVel
+    
+    def move(self, dt):
+        self.xPos += self.xVel * dt
+        self.yPos += self.yVel * dt
 
-def printGrid(screen = None):
-    global grid, rows, columns
+def createParticles(density, width, height, offset):
+    particles = []
+    for i in range(int(width*density)):
+        for j in range(int(height*density)):
+            particles.append(Particle(i / density + offset, j / density + offset))
 
-    if screen == None:
-        for row in range(rows):
-            rowString = ""
-            for column in range(columns):
-                rowString += f" {grid[column][row]:.3f}"
-            print(rowString)
-    else:
-        recalculateColors()
+    return particles
 
-        #print each point
-        for row in range(rows):
-            for column in range(columns):
-                color = getColor(grid[column][row])
-                pygame.draw.rect(screen, color, (column * scale, row * scale, scale, scale))
+def drawParticles(size):
+    for particle in particles:
+        pygame.draw.circle(screen, (0, 0, 255), (particle.xPos, particle.yPos), size)
 
-def clamp(value, minValue, maxValue):
-    return max(min(value, maxValue), minValue)
+def drawInfo():
+    #fps
+    fps = "∞" if dt == 0 else str(1/dt)
+    fps_text = font.render(f"FPS: {fps}", True, (255, 0, 0))
+    screen.blit(fps_text, (10, 10))
 
-def getColor(value):
-    percent = value/maxPressure
-    num = int(percent * 255)
-    return (num, num, num)
+def addVelocity(xVel, yVel):
+    for particle in particles:
+        particle.addVel(xVel, yVel)
 
-def recalculateColors():
-    global maxPressure, grid
-
-    maxPressure = grid[0][0]
-    for column in range(columns):
-            for row in range(rows):
-                if grid[column][row] > maxPressure:
-                    maxPressure = grid[column][row]
-
-#creates empty grid
-def createGrid(rows, columns):
-    grid = []
-    for column in range(columns):
-        grid.append([])
-        for row in range(rows):
-            grid[column].append(0)
-    return grid
-
-#bernoulli's principle (high pressure -> low pressure areas)
-def disperse(multiplier):
-    for column in range(columns):
-        for row in range(rows):
-            originalPressure = grid[column][row]
-            dispersedPressure = originalPressure * multiplier
-            newPressure =  originalPressure - dispersedPressure
-            dispersedPressure /= 4
-            
-            if column + 1 < len(grid):
-                grid[column + 1][row] += dispersedPressure
-            else:
-                newPressure += dispersedPressure
-            
-            if column - 1 >= 0:
-                grid[column - 1][row] += dispersedPressure
-            else:
-                newPressure += dispersedPressure
-            
-            if row + 1 < len(grid[0]):
-                grid[column][row + 1] += dispersedPressure
-            else:
-                newPressure += dispersedPressure
-            
-            if row - 1 >= 0:
-                grid[column][row - 1] += dispersedPressure
-            else:
-                newPressure += dispersedPressure
-            
-            grid[column][row] = newPressure
-
-
-#move fluid down
-def applyGravity(multiplier):
-    for column in range(columns):
-        for row in range(rows):
-            if row + 1 < len(grid[0]):
-                dispersedPressure = grid[column][row] * multiplier
-                grid[column][row] -= dispersedPressure
-                grid[column][row + 1] += dispersedPressure
-
-
-def text_to_screen(screen, text, x, y, size=50, color=(200, 000, 000), font_type=pygame.font.get_default_font()):
-	text = str(text)
-	font = pygame.font.Font(font_type, size)
-	text = font.render(text, True, color)
-	screen.blit(text, (x, y))
-
+def moveParticles(dt):
+    for particle in particles:
+        particle.move(dt)
 
 #start display
 pygame.init()
-screen = pygame.display.set_mode((rows * scale, columns * scale))
-pygame.display.set_caption("Fluid simulation")
+screenWidth = 500
+screenHeight = 500
+screen = pygame.display.set_mode((screenWidth, screenHeight))
+pygame.display.set_caption("FLIP + PIC Fluid simulation")
+font = pygame.font.Font(None, 36)
 
 #info
-grid = createGrid(rows, columns)
-gravity = 30
-speed = 30
+gravity = 700
 dt = 0
-maxPressure = 0 #not a limit, this is for coloring
 lastFrameTime = time.time()
-font = pygame.font.Font(None, 36)
+
+particleSize = 5
+particles = createParticles(0.1, screenWidth, screenHeight, particleSize)
 
 #loop
 while True:
@@ -119,18 +65,33 @@ while True:
         if event.type == pygame.QUIT:
             exit()
 
-    #grid[int(columns/2)][int(rows/2)] = 1
-    grid[10][int(10)] += 1
-    
-    disperse(speed * dt)
-    applyGravity(gravity * dt)
-
-    printGrid(screen)
-
+    #get dt (for frame independance)
     dt = time.time() - lastFrameTime
     lastFrameTime = time.time()
-    fps_text = font.render(f"FPS: {int(1/dt)}", True, (255, 0, 0))
-    screen.blit(fps_text, (10, 10))
-    #printGrid()
 
+    ### particle stuff:
+    #apply gravity
+    addVelocity(0, gravity * dt)
+    #move particles 
+    moveParticles(dt)
+    #seperate particles
+    #seperateParticles()
+    #push out of obstacles
+    #pushParticlesOutOfObstacles()
+
+    ### grid stuff:
+    # particles to grid
+    #grid = particlesToGrid()
+    # make incompressible
+    #solveGrid()
+    # grid to particles
+    #particles = gridToParticles()
+
+
+    ### visuals:
+    screen.fill((255, 255, 255))
+    drawParticles(3)
+    drawInfo()
+
+    #update screen
     pygame.display.flip()
