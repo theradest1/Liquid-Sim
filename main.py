@@ -32,8 +32,8 @@ class Particle:
 #mainly used for particle -> grid -> particle
 class Corner:
     def __init__(self):
-        self.xVel = 7
-        self.yVel = 7
+        self.xVel = 0
+        self.yVel = 0
         self.isAir = False
     
     def draw(self, x, y, scale, cellSize, color, size):
@@ -61,7 +61,7 @@ class Cell:
 #for solving for incompressibility once in grid form
 class Edge:
     def __init__(self):
-        self.velocity = 10
+        self.velocity = 0
     
     def draw(self, x, y, scale, cellSize, xDir, yDir, color, size):
         pygame.draw.line(screen, color, (x * cellSize * scale, y * cellSize * scale), (x * cellSize * scale + xDir * self.velocity * scale, y * cellSize * scale + yDir * self.velocity * scale), size)
@@ -202,17 +202,14 @@ def moveParticles(dt):
 
 #info
 gravity = 700
-gridWidth = 5
-gridHeight = 5
-cellSize = 50
-scale = 4 #for visuals
+gridWidth = 50
+gridHeight = 50
+cellSize = 10
+scale = 2 #for visuals
+particleSize = 3
 dt = 0
 lastFrameTime = time.time()
 
-particleSize = 5
-#particles = createParticles(0.1, screenWidth, screenHeight, particleSize)
-
-grid = Grid(cellSize, gridWidth, gridHeight)
 
 #start display
 pygame.init()
@@ -221,6 +218,10 @@ screenHeight = gridHeight * cellSize * scale
 screen = pygame.display.set_mode((screenWidth, screenHeight))
 pygame.display.set_caption("FLIP + PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
+
+#initialize data
+particles = createParticles(0.1, screenWidth, screenHeight, particleSize)
+grid = Grid(cellSize, gridWidth, gridHeight)
 
 #simulation loop
 while True:
@@ -235,9 +236,9 @@ while True:
 
     ### particle stuff:
     #apply gravity
-    #addVelocity(0, gravity * dt)
+    addVelocity(0, gravity * dt)
     #move particles 
-    #moveParticles(dt)
+    moveParticles(dt)
     #seperate particles
     #seperateParticles()
     #push out of obstacles
@@ -253,9 +254,9 @@ while True:
 
 
     ### visuals:
-    screen.fill((255, 255, 255))
-    grid.draw(scale, True, True)
-    #drawParticles(3)
+    screen.fill((100, 100, 100))
+    #grid.draw(scale, False, False)
+    drawParticles(3)
     drawInfo()
 
     #update screen
