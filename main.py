@@ -6,19 +6,28 @@ def textToScreen(text, color, position):
     screen.blit(font.render(text, True, color), position)
 
 
+def normalize_tuple(t):
+    # Calculate the Euclidean norm of the tuple
+    norm = math.sqrt(sum(x**2 for x in t))
+    
+    # Avoid division by zero
+    if norm == 0:
+        raise ValueError("Cannot normalize a tuple with zero magnitude")
+    
+    # Return the normalized tuple
+    return tuple(x / norm for x in t)
+
+
+def clamp(value, minValue, maxValue):
+    return max(min(value, maxValue), minValue)
+
+
 class Particle:
     def __init__(self, x, y):
         self.xPos = x
         self.yPos = y
         self.xVel = 0
         self.yVel = 0
-
-        #in the positions of the quadrants
-        #weights for how much cell corners are influenced by particles
-        self.w1 = 0
-        self.w2 = 0
-        self.w3 = 0
-        self.w4 = 0
     
     def addVel(self, xVel, yVel):
         self.xVel += xVel
@@ -26,24 +35,43 @@ class Particle:
     
     def move(self, dt):
         self.xPos += self.xVel * dt
-        self.yPos += self.yVel * dt
+        if self.xPos >= maxX or self.xPos <= 0:
+            self.xPos = clamp(self.xPos, 0, maxX)
+            self.xVel = 0
 
+        self.yPos += self.yVel * dt
+        if self.yPos >= maxY or self.yPos <= 0:
+            self.yPos = clamp(self.yPos, 0, maxY)
+            self.yVel = 0
+    
+    def draw(self, scale, color):
+        pygame.draw.circle(screen, color, (self.xPos * scale, self.yPos * scale), scale/2)
+        
 
 #mainly used for particle -> grid -> particle
 class Corner:
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.xVel = 0
         self.yVel = 0
-        self.isAir = False
     
     def draw(self, x, y, scale, cellSize, color, size):
-        pygame.draw.circle(screen, color, (x * cellSize * scale, y * cellSize * scale), size * 3)
-        pygame.draw.line(screen, color, (x * cellSize * scale, y * cellSize * scale), (x * cellSize * scale + self.xVel * scale, y * cellSize * scale + self.yVel * scale), size)
 
+        if self.xVel != 0 and self.yVel != 0:
+            pygame.draw.circle(screen, color, (x * cellSize * scale, y * cellSize * scale), size * 3)
+            
+            xDiff, yDiff = normalize_tuple((self.xVel, self.yVel))
+            pygame.draw.line(screen, color, (x * cellSize * scale, y * cellSize * scale), (x * cellSize * scale + xDiff * scale * 3, y * cellSize * scale + yDiff * scale * 3), size)
+            #print(f"{self.xVel}, {self.yVel}")
 
 #references to other data (like corners  or edges)
 class Cell:
     def __init__(self, x, y, grid):
+        self.xPos = x
+        self.yPos = y
+
         self.edge_top = grid.horizontalEdges[x][y]
         self.edge_bottom = grid.horizontalEdges[x][y + 1]
         self.edge_left = grid.verticalEdges[x][y]
@@ -53,10 +81,47 @@ class Cell:
         self.corner_top_right = grid.corners[x + 1][y]
         self.corner_bottom_left = grid.corners[x][y + 1]
         self.corner_bottom_right = grid.corners[x + 1][y + 1]
-        
-        #self.corners = [grid.corners[x][y], grid.corners[x][y - 1], grid.corners[x - 1][y], grid.corners[x - 1][y - 1]]
-        #self.edges = [grid.verticalEdges[x][y], grid.edges[x][y - 1], grid.edges[x - 1][y], grid.edges[x - 1][y - 1]]
-        pass
+
+        self.reset()
+
+    def reset(self):
+        self.isAir = True
+        self.particles = []
+    
+    def addParticle(self, particle):
+        self.isAir = False
+
+        remainderX = particle.xPos - self.xPos * cellSize
+        remainderY = particle.yPos - self.yPos * cellSize
+
+        particle.weight_top_left = (1 - remainderX/cellSize) * remainderY/cellSize
+        particle.weight_top_right = remainderX/cellSize * remainderY/cellSize
+        particle.weight_bottom_left = (1 - remainderX/cellSize) * (1 - remainderY/cellSize)
+        particle.weight_bottom_right = remainderX/cellSize * (1 - remainderY/cellSize)
+
+        self.corner_top_left.xVel += particle.xVel * particle.weight_top_left
+        self.corner_top_right.xVel += particle.xVel * particle.weight_top_right
+        self.corner_bottom_left.xVel += particle.xVel * particle.weight_bottom_left
+        self.corner_bottom_right.xVel += particle.xVel * particle.weight_bottom_right
+
+        self.corner_top_left.yVel += particle.yVel * particle.weight_top_left
+        self.corner_top_right.yVel += particle.yVel * particle.weight_top_right
+        self.corner_bottom_left.yVel += particle.yVel * particle.weight_bottom_left
+        self.corner_bottom_right.yVel += particle.yVel * particle.weight_bottom_right
+    
+    def updateParticles(self):
+        for particle in self.particles:
+            #particle.xVel = 
+            pass
+    
+    def updateEdgeValues():
+        #get the edge values from the corners
+        raise NotImplementedError
+
+    def updateCornerValues():
+        #get the corner values from the corners
+        raise NotImplementedError
+
 
 #for solving for incompressibility once in grid form
 class Edge:
@@ -78,19 +143,18 @@ class Grid:
         self.verticalEdges = [[Edge() for _ in range(width + 1)] for _ in range(height + 1)] #h
         self.horizontalEdges = [[Edge() for _ in range(width + 1)] for _ in range(height + 1)]
 
-        print(str(len(self.horizontalEdges)) + ", " + str(len(self.horizontalEdges[0])))
-
         #create cells
         self.cells = []
-        for x in range(width):
+        for x in range(height):
             self.cells.append([])
-            for y in range(height):
+            for y in range(width):
                 self.cells[x].append(Cell(x, y, self))
     
     def draw(self, scale, drawCorners, drawEdges):
         mouseX, mouseY = pygame.mouse.get_pos()
         cellX = math.floor(mouseX/scale/self.cellSize)
         cellY = math.floor(mouseY/scale/self.cellSize)
+        print(cellX)
         highlightedCell = self.cells[cellX][cellY]
 
         for x in range(len(self.cells)):
@@ -128,17 +192,22 @@ class Grid:
                         edge.draw(x + .5, y, scale, cellSize, 0, 1, (0, 0, 0), 1)
 
 
-def particlesToGrid(gridWidth, gridHeight):
-    grid = [[None] * gridWidth] * gridHeight
+def particlesToGrid():
+    for corner_row in grid.corners:
+        for corner in corner_row:
+            corner.reset()
+
+    for cell_row in grid.cells:
+        for cell in cell_row:
+            cell.reset()
+
     for particle in particles:
-        cellX = math.floor(particle.xPos/gridWidth)
-        cellY = math.floor(particle.yPos/gridHeight)
+        cellX = math.floor(particle.xPos/grid.cellSize)
+        cellY = math.floor(particle.yPos/grid.cellSize)
         
-        if grid[cellX][cellY] is not None:
-            grid[cellX][cellY].addParticle(particle)
-        else:
-            grid[cellX][cellY] = Cell(particle)
-    return grid
+        #print(f"{cellX}, {cellY}")
+        cell = grid.cells[cellX][cellY]
+        cell.addParticle(particle)
 
 
 def solveGrid(): #make in/out flow 0 (because it is roughly incompressible)
@@ -147,41 +216,30 @@ def solveGrid(): #make in/out flow 0 (because it is roughly incompressible)
         for cellY in range(len(grid[0])):
             cell = grid[cellX][cellY]
 
-            #if cell has particles
-            if cell is not None:
-
-                #get divergence (flow)
-                #divergence = (grid[cellX + 1][cellY].xVel - grid[cellX][cellY].xVel) + (grid[cellX][cellY + 1].yVel - grid[cellX][cellY].yVel)
-
-
-                #sides = 4
-                #if cellX == 0 or cellX == len(grid) - 1:
-                #    sides -= 1
-                pass
+            #if cell is not empty
+            if not cell.isAir:
+                raise NotImplementedError
 
 
 def gridToParticles():
-    particles = []
-    for cellX in range(len(grid)):
-        for cellY in range(len(grid[0])):
-            cell = grid[cellX][cellY]
-            if cell is not None:
-                particles.extend(cell.particles)
-    return particles
+    #loop through cells
+    for cell_row in grid.cells:
+        for cell in cell_row:
+            cell.updateParticles()
 
 
 def createParticles(density, width, height, offset):
     particles = []
-    for i in range(int(width*density)):
-        for j in range(int(height*density)):
-            particles.append(Particle(i / density + offset, j / density + offset))
+    for x in range(int(width*density)):
+        for y in range(int(height*density)):
+            particles.append(Particle(x / density + offset, y / density + offset))
 
     return particles
 
 
-def drawParticles(size):
+def drawParticles(scale):
     for particle in particles:
-        pygame.draw.circle(screen, (0, 0, 255), (particle.xPos, particle.yPos), size)
+        particle.draw(scale, (0, 0, 255))
 
 
 def drawInfo():
@@ -201,12 +259,16 @@ def moveParticles(dt):
 
 
 #info
-gravity = 700
-gridWidth = 50
-gridHeight = 50
-cellSize = 10
-scale = 2 #for visuals
-particleSize = 3
+gravity = 3
+gridWidth = 5
+gridHeight = 3
+cellSize = 30
+scale = 7 #for visuals
+
+#particle bounds
+maxX = gridWidth * cellSize - .05
+maxY = gridHeight * cellSize - .05
+
 dt = 0
 lastFrameTime = time.time()
 
@@ -220,7 +282,8 @@ pygame.display.set_caption("FLIP + PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
 
 #initialize data
-particles = createParticles(0.1, screenWidth, screenHeight, particleSize)
+#particles = createParticles(.5, gridWidth * cellSize * .5, gridHeight * cellSize * .5, 1)
+particles = [Particle(gridWidth * cellSize / 2, gridWidth * cellSize / 2)]
 grid = Grid(cellSize, gridWidth, gridHeight)
 
 #simulation loop
@@ -236,7 +299,11 @@ while True:
 
     ### particle stuff:
     #apply gravity
-    addVelocity(0, gravity * dt)
+    mouseX, mouseY = pygame.mouse.get_pos()
+    #addVelocity(0, gravity * dt)
+    #xGrav, yGrav = normalize_tuple((mouseX/scale - particles[0].xPos, mouseY/scale - particles[0].yPos))
+    addVelocity((mouseX/scale - particles[0].xPos) * dt * gravity, (mouseY/scale - particles[0].yPos) * dt * gravity)
+
     #move particles 
     moveParticles(dt)
     #seperate particles
@@ -246,18 +313,19 @@ while True:
 
     ### grid stuff:
     # particles to grid
-    #grid = particlesToGrid(gridWidth, gridHeight)
+    particlesToGrid()
     # make incompressible
     #solveGrid()
     # grid to particles
-    #particles = gridToParticles()
+    gridToParticles()
 
 
     ### visuals:
     screen.fill((100, 100, 100))
-    #grid.draw(scale, False, False)
-    drawParticles(3)
+    grid.draw(scale, True, False)
+    drawParticles(scale)
     drawInfo()
+    #print(f"{particles[0].xPos}, {particles[0].yPos}")
 
     #update screen
     pygame.display.flip()
