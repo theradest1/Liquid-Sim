@@ -100,14 +100,20 @@ class Cell:
             particle.xVel = (self.edge_left.velocity * particle.weight_left + self.edge_right.velocity * particle.weight_right) / (particle.weight_right + particle.weight_left)
             particle.yVel = (self.edge_top.velocity * particle.weight_top + self.edge_bottom.velocity * particle.weight_bottom) / (particle.weight_top + particle.weight_bottom)
 
+    #for incompressibleness
     def solve(self, overrelaxation):
         divergence = overrelaxation * (self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity)
-        splitDivergence = divergence/4
+        openEdges = self.edge_bottom.openEdge + self.edge_top.openEdge + self.edge_left.openEdge + self.edge_right.openEdge
+        
+        if openEdges == 0:
+            return 
 
-        self.edge_right.velocity -= splitDivergence
-        self.edge_left.velocity += splitDivergence
-        self.edge_top.velocity -= splitDivergence
-        self.edge_bottom.velocity += splitDivergence
+        splitDivergence = divergence/openEdges
+
+        self.edge_right.velocity -= splitDivergence if self.edge_right.openEdge == 1 else 0
+        self.edge_left.velocity += splitDivergence if self.edge_left.openEdge == 1 else 0
+        self.edge_top.velocity -= splitDivergence if self.edge_top.openEdge == 1 else 0
+        self.edge_bottom.velocity += splitDivergence if self.edge_bottom.openEdge == 1 else 0
 
     def seperateParticles(self):
         for particle_1 in self.particles:
@@ -118,6 +124,7 @@ class Cell:
 class Edge:
     def __init__(self):
         self.reset()
+        self.openEdge = 1
 
     def reset(self):
         self.velocity = 0
@@ -135,6 +142,14 @@ class Grid:
         self.verticalEdges = [[Edge() for _ in range(width + 1)] for _ in range(height + 1)] #h
         self.horizontalEdges = [[Edge() for _ in range(width + 1)] for _ in range(height + 1)]
 
+        for y in range(len(self.horizontalEdges)):
+            for x in range(len(self.horizontalEdges[0])):
+                self.horizontalEdges[y][x].openEdge = 0 if x == 0 or x == width else 1
+
+        for y in range(len(self.verticalEdges)):
+            for x in range(len(self.verticalEdges[0])):
+                self.verticalEdges[y][x].openEdge = 0 if y == 0 or y == height else 1
+        
         #create cells
         self.cells = []
         for x in range(height):
@@ -153,7 +168,7 @@ class Grid:
                 rect = pygame.Rect(x * self.cellSize * scale, y * self.cellSize * scale, self.cellSize * scale, self.cellSize * scale)
                 
                 #if self.cells[x][y].isAir:
-                pygame.draw.rect(screen, (255, 0, 0), rect, 1)
+                pygame.draw.rect(screen, (66, 0, 0), rect, 1)
                 #else:
                 #    pygame.draw.rect(screen, pygame.Color(0, 0, 255, a=100), rect)
 
@@ -163,7 +178,9 @@ class Grid:
             for x in range(len(self.verticalEdges)):
                 for y in range(len(self.verticalEdges[0])):
                     edge = self.verticalEdges[x][y]
-                    if edge in [highlightedCell.edge_right, highlightedCell.edge_left]:
+                    if edge.openEdge == 0:
+                        pygame.draw.circle(screen, (255, 0, 0), (x * cellSize * scale, (y + .5) * cellSize * scale), 3 * scale)
+                    elif edge in [highlightedCell.edge_right, highlightedCell.edge_left]:
                         edge.draw(x, y + .5, scale, cellSize, 1, 0, (0, 255, 0), 2)
                     else:
                         edge.draw(x, y + .5, scale, cellSize, 1, 0, (0, 0, 0), 1)
@@ -172,7 +189,9 @@ class Grid:
             for x in range(len(self.horizontalEdges)):
                 for y in range(len(self.horizontalEdges[0])):
                     edge = self.horizontalEdges[x][y]
-                    if edge in [highlightedCell.edge_top, highlightedCell.edge_bottom]: 
+                    if edge.openEdge == 0:
+                        pygame.draw.circle(screen, (255, 0, 0), ((x + .5) * cellSize * scale, y * cellSize * scale), 3 * scale)
+                    elif edge in [highlightedCell.edge_top, highlightedCell.edge_bottom]: 
                         edge.draw(x + .5, y, scale, cellSize, 0, 1, (0, 255, 0), 2)
                     else:
                         edge.draw(x + .5, y, scale, cellSize, 0, 1, (0, 0, 0), 1)
@@ -275,14 +294,14 @@ def seperateParticle(particle_1, particle_2):
 
 
 #info
-gravity = 300
+gravity = 30
 gridWidth = 50
 gridHeight = 35
 cellSize = 20
-particleCount = 100
+particleCount = 5000
 particleRadius = 5
 particleMinDistance = particleRadius*2
-scale = 1 #for visuals
+scale = 1.3 #for visuals
 
 #particle bounds
 maxX = gridWidth * cellSize - .05
@@ -352,7 +371,7 @@ while True:
 
     ### visuals:
     screen.fill((100, 100, 100))
-    grid.draw(scale, False)
+    #grid.draw(scale, True)
     drawParticles(scale)
     drawInfo()
     #print(f"{particles[0].xPos}, {particles[0].yPos}")
