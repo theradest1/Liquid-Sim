@@ -24,9 +24,9 @@ def clamp(value, minValue, maxValue):
 
 
 class Particle:
-    def __init__(self, x, y):
-        self.xPos = x
-        self.yPos = y
+    def __init__(self, xBound, yBound):
+        self.xPos = random.random() * xBound
+        self.yPos = random.random() * yBound
         self.xVel = 0
         self.yVel = 0
     
@@ -100,6 +100,7 @@ class Cell:
             return
         
         self.density = self.edge_right.weight + self.edge_left.weight + self.edge_top.weight + self.edge_bottom.weight
+        #print(self.density)
     
     def updateParticles(self):
         for particle in self.particles:
@@ -121,9 +122,9 @@ class Cell:
         self.edge_top.velocity -= splitDivergence if self.edge_top.openEdge == 1 else 0
         self.edge_bottom.velocity += splitDivergence if self.edge_bottom.openEdge == 1 else 0
         
-        if printDivergence:
-            divergence = self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity
-            print(divergence)
+        #if printDivergence:
+            #divergence = self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity
+            #print(divergence)
 
     def seperateParticles(self):
         for particle_1 in self.particles:
@@ -310,7 +311,7 @@ def seperateParticle(particle_1, particle_2):
 
 
 #info
-gravity = 30
+gravity = 50
 gridWidth = 50
 gridHeight = 35
 cellSize = 20
@@ -318,9 +319,9 @@ particleCount = 3000
 particleRadius = 5
 gridItterations = 3
 particleItterations = 3
-stiffness = 1
-averageDensity = 0
-overrelaxation = 1.1
+stiffness = 0
+averageDensity = 1
+overrelaxation = 1
 particleMinDistance = particleRadius*2
 scale = 1.3 #for visuals
 
@@ -337,13 +338,13 @@ pygame.init()
 screenWidth = gridWidth * cellSize * scale
 screenHeight = gridHeight * cellSize * scale
 screen = pygame.display.set_mode((screenWidth, screenHeight))
-pygame.display.set_caption("FLIP + PIC Fluid simulation")
+pygame.display.set_caption("PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
 
 #initialize data
 particles = []
 for i in range(particleCount):
-    particles.append(Particle(random.random() * cellSize * gridWidth, random.random() * cellSize * gridHeight))
+    particles.append(Particle(cellSize * gridWidth, cellSize * gridHeight))
 
 
 grid = Grid(cellSize, gridWidth, gridHeight)
