@@ -6,7 +6,6 @@ import random
 def textToScreen(text, color, position):
     screen.blit(font.render(text, True, color), position)
 
-
 def normalize_tuple(t):
     # Calculate the Euclidean norm of the tuple
     norm = math.sqrt(sum(x**2 for x in t))
@@ -81,7 +80,6 @@ class Cell:
         particle.weight_right = remainderX/cellSize
         particle.weight_top = 1 - remainderY/cellSize
         particle.weight_bottom = remainderY/cellSize
-        #print(particle.weight_top + particle.weight_bottom + particle.weight_right + particle.weight_left)
 
         self.edge_left.velocity += particle.xVel * particle.weight_left
         self.edge_right.velocity += particle.xVel * particle.weight_right
@@ -107,30 +105,21 @@ class Cell:
             particle.xVel = (self.edge_left.velocity * particle.weight_left + self.edge_right.velocity * particle.weight_right) / (particle.weight_right + particle.weight_left)
             particle.yVel = (self.edge_top.velocity * particle.weight_top + self.edge_bottom.velocity * particle.weight_bottom) / (particle.weight_top + particle.weight_bottom)
 
-    #for incompressibleness
-    def solve(self, overrelaxation, stiffness, averageDensity, printDivergence):
+    #for incompressibility
+    def solve(self, overrelaxation):
         if self.isAir:
-            return
+            return 0
 
         openEdges = self.edge_bottom.openEdge + self.edge_top.openEdge + self.edge_left.openEdge + self.edge_right.openEdge
-        divergence = overrelaxation * (self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity) - stiffness * (self.density - averageDensity)
-
+        divergence = overrelaxation * (self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity)# - stiffness * (self.density - averageDensity)
         splitDivergence = divergence/openEdges
 
-        self.edge_right.velocity -= splitDivergence if self.edge_right.openEdge == 1 else 0
-        self.edge_left.velocity += splitDivergence if self.edge_left.openEdge == 1 else 0
-        self.edge_top.velocity -= splitDivergence if self.edge_top.openEdge == 1 else 0
-        self.edge_bottom.velocity += splitDivergence if self.edge_bottom.openEdge == 1 else 0
+        self.edge_right.velocity -= splitDivergence * self.edge_right.openEdge
+        self.edge_left.velocity += splitDivergence * self.edge_left.openEdge
+        self.edge_top.velocity -= splitDivergence * self.edge_top.openEdge
+        self.edge_bottom.velocity += splitDivergence * self.edge_bottom.openEdge
         
-        #if printDivergence:
-            #divergence = self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity
-            #print(divergence)
-
-    def seperateParticles(self):
-        for particle_1 in self.particles:
-            for particle_2 in self.particles:
-                if particle_1 != particle_2:
-                    seperateParticle(particle_1, particle_2)
+        return self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity
 
 class Edge:
     def __init__(self):
@@ -229,12 +218,20 @@ def particlesToGrid():
         cell.addParticle(particle)
 
 
-def solveGrid(iterations, overrelaxation, stiffness, averageDensity): #make in/out flow 0 (because it is roughly incompressible)
+def solveGrid(maxIterations, maxDivergence, overrelaxation): #make in/out flow 0 (because it is roughly incompressible)
     #loop through all cells
-    for i in range(iterations):
+    i = 0
+    divergence = maxDivergence + 1
+    while divergence > maxDivergence and i <= maxIterations:
+        i += 1
+        divergence = 0
         for cell_row in grid.cells:
             for cell in cell_row:
-                cell.solve(overrelaxation, stiffness, averageDensity, True if i == iterations - 1 else False)
+                newDivergence = cell.solve(overrelaxation)
+
+                if newDivergence > divergence:
+                    divergence = newDivergence
+    #print(f"{i}/{maxIterations}")
 
 
 def updateDensity():
@@ -281,21 +278,22 @@ def moveParticles(dt):
         particle.move(dt)
 
 
-#uses already made grid system
-def seperateParticles(itterations):
-    for i in range(itterations):
-        for cell_row in grid.cells:
-            for cell in cell_row:
-                cell.seperateParticles()
+def seperateParticles(maxIterations):
+    for i in range(maxIterations):
+        for particle_1 in particles:
+            for particle_2 in particles:
+                seperateTwoParticles(particle_1, particle_2)
 
+def seperateTwoParticles(particle_1, particle_2):
+    if particle_1 == particle_2:
+        return
 
-def seperateParticle(particle_1, particle_2):
     dx = particle_2.xPos - particle_1.xPos
     dy = particle_2.yPos - particle_1.yPos
 
     distance = math.sqrt(dx**2 + dy**2)
-    if distance < particleMinDistance:
-        overlap = particleMinDistance - distance
+    if distance < particleRadius - particleRadius * .05: #is overlaping
+        overlap = particleRadius - distance
         
         # Calculate the direction in which to move the circles
         angle = math.atan2(dy, dx)
@@ -315,12 +313,13 @@ gravity = 50
 gridWidth = 50
 gridHeight = 35
 cellSize = 20
-particleCount = 3000
+particleCount = 500
 particleRadius = 5
-gridItterations = 3
-particleItterations = 3
-stiffness = 0
-averageDensity = 1
+#seperationGridCellSize = particleRadius * 2
+#seperationGridXCount = 
+gridItterations = 1
+maxDivergence = .00001
+maxParticleItterations = 5
 overrelaxation = 1
 particleMinDistance = particleRadius*2
 scale = 1.3 #for visuals
@@ -372,6 +371,7 @@ while True:
     #move particles 
     moveParticles(dt)
     #seperate particles
+    seperateParticles(maxParticleItterations)
     #push out of obstacles
     #pushParticlesOutOfObstacles()
 
@@ -381,11 +381,11 @@ while True:
     #to push particles apart
     updateDensity()
     # make incompressible
-    solveGrid(gridItterations, overrelaxation, stiffness, averageDensity)
+    solveGrid(gridItterations, maxDivergence, overrelaxation)
     # grid to particles
     gridToParticles()
 
-    seperateParticles(particleItterations) #need to make this better
+
 
     ### visuals:
     screen.fill((100, 100, 100))

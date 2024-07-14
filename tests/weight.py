@@ -1,5 +1,5 @@
 import pygame
-import math
+#import math
 
 def textToScreen(text, color, position):
     screen.blit(font.render(text, True, color), position)
@@ -14,11 +14,13 @@ class Edge():
     def __init__(self):
         self.velocity = 0
     
-    def draw(self, x, y, radius, valueToPrint):
+    def draw(self, x, y, radius, valueToPrint = None):
         screenPos = (x * scale + 100, y * scale + 100)
 
         pygame.draw.circle(screen, (0, 0, 0), screenPos, radius)
-        textToScreen(str(valueToPrint), (255, 255, 255), screenPos)
+
+        if valueToPrint is not None:
+            textToScreen(str(valueToPrint), (255, 255, 255), screenPos)
     
 scale = 300
 horizontalEdges = [[Edge()], [Edge()]]
@@ -34,11 +36,13 @@ while True:
     weights = []
 
     mouseX, mouseY = pygame.mouse.get_pos()
-    mouseX /= scale
-    mouseY /= scale
+    mouseX = (mouseX - 100) / scale
+    mouseY = (mouseY - 100) / scale
 
-    weights.append()
-
+    weights.append(1 - mouseY)
+    weights.append(mouseY)
+    weights.append(1 - mouseX)
+    weights.append(mouseX)
 
     screen.fill((100, 100, 100))
 
@@ -46,12 +50,12 @@ while True:
 
     for x in range(len(horizontalEdges[0])):
         for y in range(len(horizontalEdges)):
-            horizontalEdges[y][x].draw(x + .5, y, 5, weights[count])
+            horizontalEdges[y][x].draw(x + .5, y, weights[count] * 10, weights[count])
             count += 1
     
     for x in range(len(verticalEdges[0])):
         for y in range(len(verticalEdges)):
-            verticalEdges[y][x].draw(x, y + .5, 5, weights[count])
+            verticalEdges[y][x].draw(x, y + .5, weights[count] * 10, weights[count])
             count += 1
 
     pygame.display.flip()
