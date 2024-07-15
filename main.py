@@ -55,7 +55,7 @@ class Particle:
             self.yVel = 0
     
     def draw(self, scale, color):
-        pygame.draw.circle(screen, color, (self.xPos * scale, self.yPos * scale), scale * particleRadius)
+        pygame.draw.circle(screen, color, (self.xPos * scale + screenPadding, self.yPos * scale), scale * particleRadius)
         
 
 #references to other data (like corners  or edges)
@@ -84,23 +84,19 @@ class Cell:
         remainderX = particle.xPos - trueX
         remainderY = particle.yPos - trueY
 
-        pygame.draw.circle(screen, (0, 255, 0), (trueX * scale, trueY * scale), 10)
-
+        #get weights
         particle.weight_left = 1 - remainderX/cellSize
         particle.weight_right = remainderX/cellSize
         particle.weight_top = 1 - remainderY/cellSize
         particle.weight_bottom = remainderY/cellSize
 
-        #print(f"Left: {particle.weight_left}, Right: {particle.weight_right}, Top: {particle.weight_top}, Bottom: {particle.weight_bottom}")
-
+        #give edge velocity
         self.edge_left.velocity += particle.xVel * particle.weight_left * self.edge_left.openEdge
         self.edge_right.velocity += particle.xVel * particle.weight_right * self.edge_right.openEdge
         self.edge_top.velocity += particle.yVel * particle.weight_top * self.edge_top.openEdge
         self.edge_bottom.velocity += particle.yVel * particle.weight_bottom * self.edge_bottom.openEdge
 
-        #edge = particle * weight
-        #particle = edge / weight
-
+        #give edge weights
         self.edge_left.weight += particle.weight_left
         self.edge_right.weight += particle.weight_right
         self.edge_top.weight += particle.weight_top
@@ -117,24 +113,29 @@ class Cell:
     
     def updateParticles(self):
         for particle in self.particles:
-            particle.xVel = (self.edge_left.velocity * particle.weight_left + self.edge_right.velocity * particle.weight_right)# / (particle.weight_right + particle.weight_left)
-            particle.yVel = (self.edge_top.velocity * particle.weight_top + self.edge_bottom.velocity * particle.weight_bottom)# / (particle.weight_top + particle.weight_bottom)
+            particle.xVel = (self.edge_left.velocity * particle.weight_left + self.edge_right.velocity * particle.weight_right) / (particle.weight_right + particle.weight_left)
+            particle.yVel = (self.edge_top.velocity * particle.weight_top + self.edge_bottom.velocity * particle.weight_bottom) / (particle.weight_top + particle.weight_bottom)
 
     #for incompressibility
     def solve(self, overrelaxation):
+        #get how many edges can be changed
         openEdges = self.edge_bottom.openEdge + self.edge_top.openEdge + self.edge_left.openEdge + self.edge_right.openEdge
         
+        #calculate pressure, pushes particles away from dense areas - helps the particle seperation
         pressureDivergence = stiffness * (self.density - averageDensity)
         pressureDivergence = clamp(pressureDivergence, 0, abs(pressureDivergence))
         
+        #find the divergence - total fluid volume going out of cell
         divergence = overrelaxation * (-self.edge_right.velocity + self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity) - pressureDivergence
         splitDivergence = divergence/openEdges
 
+        #apply divergence
         self.edge_right.velocity += splitDivergence * self.edge_right.openEdge
         self.edge_left.velocity -= splitDivergence * self.edge_left.openEdge
         self.edge_top.velocity -= splitDivergence * self.edge_top.openEdge
         self.edge_bottom.velocity += splitDivergence * self.edge_bottom.openEdge
         
+        #return new divergence for future use
         return self.edge_right.velocity - self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity
 
 class Edge:
@@ -150,8 +151,11 @@ class Edge:
         self.weight = 0
     
     def draw(self, x, y, scale, cellSize, xDir, yDir, color, size):
-        startPos = (x * cellSize * scale, y * cellSize * scale)
-        endPos = (x * cellSize * scale + xDir * self.velocity * scale, y * cellSize * scale + yDir * self.velocity * scale)
+        #find start and end position of velocity line
+        startPos = (x * cellSize * scale + screenPadding, y * cellSize * scale + screenPadding)
+        endPos = (x * cellSize * scale + xDir * self.velocity * scale + screenPadding, y * cellSize * scale + yDir * self.velocity * scale + screenPadding)
+        
+        #draw
         pygame.draw.line(screen, color, startPos, endPos, size)
 
 
@@ -163,10 +167,12 @@ class Grid:
         self.verticalEdges = [[Edge() for _ in range(width + 1)] for _ in range(height)]
         self.horizontalEdges = [[Edge() for _ in range(width)] for _ in range(height + 1)]
 
+        #make edges closed if on the bottom
         for y in range(len(self.horizontalEdges)):
             for x in range(len(self.horizontalEdges[0])):
                 self.horizontalEdges[y][x].openEdge = 0 if y == height else 1
 
+        #make edges closed if on the left or right
         for y in range(len(self.verticalEdges)):
             for x in range(len(self.verticalEdges[0])):
                 self.verticalEdges[y][x].openEdge = 0 if x == 0 or x == width else 1
@@ -178,32 +184,28 @@ class Grid:
             for x in range(width):
                 self.cells[y].append(Cell(x, y, self))
     
-    def draw(self, scale, drawEdges):
-        #mouseX, mouseY = pygame.mouse.get_pos()
-        #cellX = math.floor(mouseX/scale/self.cellSize)
-        #cellY = math.floor(mouseY/scale/self.cellSize)
-        #highlightedCell = self.cells[cellX][cellY]
-
-        for y in range(len(self.cells)):
-            for x in range(len(self.cells[0])):
-                rect = pygame.Rect(x * self.cellSize * scale, y * self.cellSize * scale, self.cellSize * scale, self.cellSize * scale)
-                
-                #if self.cells[y][x].isAir:
-                pygame.draw.rect(screen, (66, 0, 0), rect, 1)
-                #else:
-                #    pygame.draw.rect(screen, pygame.Color(0, 0, 255, a=100), rect)
+    def draw(self, scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels):
+        if draw_grid:
+            for y in range(len(self.cells)):
+                for x in range(len(self.cells[0])):
+                    #setup
+                    rect = pygame.Rect(x * self.cellSize * scale + screenPadding, y * self.cellSize * scale + screenPadding, self.cellSize * scale, self.cellSize * scale)
+                    
+                    #draw blue if there are particles
+                    if self.cells[y][x].isAir or not draw_grid_colors:
+                        pygame.draw.rect(screen, (66, 0, 0), rect, 1)
+                    else:
+                        pygame.draw.rect(screen, (0, 0, 100), rect)
 
 
-        if drawEdges:
+        if draw_edges:
             #vertical
             for y in range(len(self.verticalEdges)):
                 for x in range(len(self.verticalEdges[0])):
                     edge = self.verticalEdges[y][x]
                     if edge.openEdge == 0:
-                        pygame.draw.circle(screen, (255, 0, 0), (x * cellSize * scale, (y + .5) * cellSize * scale), 3 * scale)
-                    #elif edge in [highlightedCell.edge_right, highlightedCell.edge_left]:
-                    #    edge.draw(x, y + .5, scale, cellSize, 1, 0, (0, 255, 0), 2)
-                    else:
+                        pygame.draw.circle(screen, (255, 0, 0), (x * cellSize * scale, (y + .5) * cellSize * scale), 2 * scale)
+                    elif draw_edge_vels:
                         edge.draw(x, y + .5, scale, cellSize, 1, 0, (0, 0, 0), 1)
             
             #horizontal
@@ -211,10 +213,8 @@ class Grid:
                 for x in range(len(self.horizontalEdges[0])):
                     edge = self.horizontalEdges[y][x]
                     if edge.openEdge == 0:
-                        pygame.draw.circle(screen, (255, 0, 0), ((x + .5) * cellSize * scale, y * cellSize * scale), 3 * scale)
-                    #elif edge in [highlightedCell.edge_top, highlightedCell.edge_bottom]: 
-                    #    edge.draw(x + .5, y, scale, cellSize, 0, 1, (0, 255, 0), 2)
-                    else:
+                        pygame.draw.circle(screen, (255, 0, 0), ((x + .5) * cellSize * scale, y * cellSize * scale), 2 * scale)
+                    elif draw_edge_vels:
                         edge.draw(x + .5, y, scale, cellSize, 0, 1, (0, 0, 0), 1)
 
 
@@ -238,12 +238,13 @@ def particlesToGrid():
         cell = grid.cells[cellY][cellX]
         cell.addParticle(particle)
 
-
-def solveGrid(maxIterations, overrelaxation): #make in/out flow 0 (because it is roughly incompressible)
+#make in/out flow 0 (because it is roughly incompressible)
+def solveGrid(maxIterations, overrelaxation):
     #loop through all cells
     for i in range(maxIterations):
         for cell_row in grid.cells:
             for cell in cell_row:
+                #solve if it has particles
                 if not cell.isAir:
                     cell.solve(overrelaxation)
 
@@ -256,6 +257,7 @@ def updateDensity():
 
 
 def gridToParticles():
+    #take average of velocities
     for edge_row in grid.verticalEdges:
         for edge in edge_row:
             if edge.weight != 0:
@@ -278,9 +280,15 @@ def drawParticles(scale):
 
 
 def drawInfo():
+    spacing = 20
+
     #fps
-    fps = "FPS: " + ("9999" if dt == 0 else str(round(1/dt)))
-    textToScreen(fps, (0, 0, 0), (1, 1))
+    fps_string = "FPS: " + ("Infinite" if dt == 0 else str(round(1/dt)))
+    textToScreen(fps_string, (0, 0, 0), (1, 1))
+
+    #particles
+    particles_string = "Particles: " + str(len(particles))
+    textToScreen(particles_string, (0, 0, 0), (1, 1 * spacing))
 
 
 def addVelocity(xVel, yVel):
@@ -292,7 +300,7 @@ def moveParticles(dt):
     for particle in particles:
         particle.move(dt)
 
-
+#improve
 def seperateParticles(maxIterations):
     for i in range(maxIterations):
         for particle_1 in particles:
@@ -304,27 +312,31 @@ def seperateTwoParticles(particle_1, particle_2):
     if particle_1 == particle_2:
         return
 
+    #get distance between particles
     dx = particle_2.xPos - particle_1.xPos
     dy = particle_2.yPos - particle_1.yPos
-
     distance = math.sqrt(dx**2 + dy**2)
-    if distance < minParticleDistance: #is overlaping
+
+    #if overlaping, move apart
+    if distance < minParticleDistance: 
+        #find distance to move
         overlap = minParticleDistance - distance
         
-        # Calculate the direction in which to move the circles
+        #find direction to move
         angle = math.atan2(dy, dx)
         
-        # Move the circles away from each other
+        #find the vector to move (with the angle and distance)
         move_x = overlap * math.cos(angle) / 2
         move_y = overlap * math.sin(angle) / 2
         
+        #move particles
         particle_1.xPos = clamp(particle_1.xPos - move_x, 0, maxX)
         particle_1.yPos = clamp(particle_1.yPos - move_y, 0, maxY)
         particle_2.xPos = clamp(particle_2.xPos + move_x, 0, maxX)
         particle_2.yPos = clamp(particle_2.yPos + move_y, 0, maxY)
 
 
-###info
+### settings
 #other
 gravity = 50
 stiffness = 0
@@ -333,15 +345,22 @@ overrelaxation = 1.5
 
 #visuals
 scale = 2.5
+maxFps = 30
 screenWidth = 700
+screenPadding = 3 #should be the radius of the particles
+draw_particles = True
+draw_grid = False
+draw_grid_colors = False
+draw_edges = False
+draw_edge_vels = False
 screenHeight = screenWidth #just leave this, its annoying
 
 #particles
 particleCount = 100
 particleRadius = 3
-minParticleDistance = particleRadius * 2
 maxParticleItterations = 2
-particleMinDistance = particleRadius*2
+minParticleDistance = particleRadius * 2
+particleMinDistance = particleRadius * 2
 maxX = screenWidth/scale - .0001
 maxY = screenHeight/scale - .0001
 
@@ -352,30 +371,31 @@ gridWidth = math.floor(screenWidth/scale/targetCellSize)
 gridHeight = math.floor(screenHeight/scale/targetCellSize)
 cellSize = screenWidth/scale/gridWidth
 
-print(screenWidth/scale/gridWidth)
-
+#fix screen height to fit better (to be square)
 difference = screenHeight - gridHeight * cellSize * scale
 if difference != 0:
     screenHeight -= difference
     print("Screen height was adjusted to", screenHeight, "to fit cells better")
 
-#start display
+#initialize display
 pygame.init()
-screen = pygame.display.set_mode((screenWidth, screenHeight))
+screen = pygame.display.set_mode((screenWidth + screenPadding*2, screenHeight + screenPadding*2))
 pygame.display.set_caption("PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
 
 #initialize data
+grid = Grid(cellSize, gridWidth, gridHeight)
+
 particles = []
 for i in range(particleCount):
     particles.append(Particle(cellSize * gridWidth/2, cellSize * gridHeight/2))
 
-grid = Grid(cellSize, gridWidth, gridHeight)
 
 #start time keeping stuffs
 clock = pygame.time.Clock()
 dt = 0
 lastFrameTime = time.time()
+
 
 #simulation loop
 while True:
@@ -384,43 +404,39 @@ while True:
         if event.type == pygame.QUIT:
             exit()
 
+
     #get dt (for frame independance)
     dt = time.time() - lastFrameTime
     lastFrameTime = time.time()
 
+
     ### particle stuff:
-    #apply gravity
-    addVelocity(0, gravity * dt)
-
-    #move particles 
+    addVelocity(0, gravity * dt) #apply gravity
     moveParticles(dt)
-
-    #seperate particles
     seperateParticles(maxParticleItterations)
-
-    #push out of obstacles
     #pushParticlesOutOfObstacles()
 
+
     ### grid stuff:
-    # particles to grid
     particlesToGrid()
-    
-    #to push particles apart when in clumps
-    updateDensity()
-    
-    # make incompressible
-    solveGrid(gridItterations, overrelaxation)
-    
-    # grid to particles
-    gridToParticles()
+    updateDensity() #to push particles apart when in clumps
+    solveGrid(gridItterations, overrelaxation) # make incompressible
+
+
+    gridToParticles() # grid to particles
 
     ### visuals:
-    screen.fill((100, 100, 100))
-    #grid.draw(scale, True)
-    drawParticles(scale)
+    screen.fill((100, 100, 100)) #clear
+
+    #draw things
+    grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
+    if draw_particles: 
+        drawParticles(scale)
+    
     drawInfo()
 
     #update screen
     pygame.display.flip()
 
-    clock.tick(30)
+    #lock to fps
+    clock.tick(maxFps)
