@@ -327,37 +327,37 @@ def seperateTwoParticles(particle_1, particle_2):
 ###info
 #other
 gravity = 50
-stiffness = .5
+stiffness = 0
 averageDensity = 200
-overrelaxation = 1
+overrelaxation = 1.5
 
 #visuals
 scale = 2.5
 screenWidth = 700
-screenHeight = 700
+screenHeight = screenWidth #just leave this, its annoying
 
 #particles
-particleCount = 500
+particleCount = 100
 particleRadius = 3
 minParticleDistance = particleRadius * 2
-maxParticleItterations = 5
+maxParticleItterations = 2
 particleMinDistance = particleRadius*2
 maxX = screenWidth/scale - .0001
 maxY = screenHeight/scale - .0001
 
 #grid
 gridItterations = 2
-targetCellSize = particleRadius * 5
-gridWidth = int(screenWidth/scale/targetCellSize)
-gridHeight = int(screenHeight/scale/targetCellSize)
+targetCellSize = particleRadius * 3
+gridWidth = math.floor(screenWidth/scale/targetCellSize)
+gridHeight = math.floor(screenHeight/scale/targetCellSize)
 cellSize = screenWidth/scale/gridWidth
 
-screenHeight -= cellSize - screenHeight/scale/gridHeight
-print(screenHeight)
+print(screenWidth/scale/gridWidth)
 
-if cellSize != screenHeight/scale/gridHeight:
-    print("Please choose a valid screen height and width")
-    exit()
+difference = screenHeight - gridHeight * cellSize * scale
+if difference != 0:
+    screenHeight -= difference
+    print("Screen height was adjusted to", screenHeight, "to fit cells better")
 
 #start display
 pygame.init()
@@ -368,7 +368,7 @@ font = pygame.font.Font(None, 36)
 #initialize data
 particles = []
 for i in range(particleCount):
-    particles.append(Particle(cellSize * gridWidth, cellSize * gridHeight))
+    particles.append(Particle(cellSize * gridWidth/2, cellSize * gridHeight/2))
 
 grid = Grid(cellSize, gridWidth, gridHeight)
 
@@ -416,11 +416,11 @@ while True:
 
     ### visuals:
     screen.fill((100, 100, 100))
-    grid.draw(scale, True)
+    #grid.draw(scale, True)
     drawParticles(scale)
     drawInfo()
 
     #update screen
     pygame.display.flip()
 
-    clock.tick(60)
+    clock.tick(30)
