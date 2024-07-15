@@ -2,6 +2,7 @@ import pygame
 import time
 import math
 import random
+import numpy as np
 
 def textToScreen(text, color, position):
     screen.blit(font.render(text, True, color), position)
@@ -300,21 +301,73 @@ def moveParticles(dt):
     for particle in particles:
         particle.move(dt)
 
-#improve
+class seperationCell:
+    def __init__(self):
+        self.particleIndexes = []
+        self.neighborIndexes = []
+
+#this uses numpy arrays since they are significantly faster
 def seperateParticles(maxIterations):
+    cellSize = particleRadius * 2
+    gridWidth = math.ceil(screenWidth/scale/cellSize)
+    gridHeight = math.ceil(screenHeight/scale/cellSize)
+
+    #cellCount = gridWidth * gridHeight
+
+    cells = np.array([seperationCell() for _ in range(gridWidth * gridHeight)])
+    for y in range(gridHeight):
+        for x in range(gridWidth):
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    neighborY = y + dy
+                    neighborX = x + dx
+                    if neighborY >= 0 and neighborY < gridHeight and neighborX >= 0 and neighborX < gridHeight:
+                        cells[y * gridWidth + x].neighborIndexes.append(neighborY * gridWidth + neighborX)
+
+    #convert from particle class to arrays
+    particle_xPos = np.empty(particleCount)
+    particle_yPos = np.empty(particleCount)
+
+    for index, particle in enumerate(particles):
+        particle_xPos[index] = particle.xPos
+        particle_yPos[index] = particle.yPos
+
+    #seperate particles
+    timer = time.time()
     for i in range(maxIterations):
-        for particle_1 in particles:
-            for particle_2 in particles:
-                seperateTwoParticles(particle_1, particle_2)
+        #clear past particles
+        for cell in cells:
+            cell.particleIndexes = []
+
+        #add particles to cells
+        for particle_i in range(particleCount):
+            cellX = math.floor(particle_xPos[particle_i]/cellSize)
+            cellY = math.floor(particle_yPos[particle_i]/cellSize)
+            cells[cellY * gridWidth + cellX].particleIndexes.append(particle_i)
+        
+        for cell_y in range(0, gridHeight):
+            for cell_x in range(0, gridWidth):
+                cell = cells[cell_y * gridWidth + cell_x]
+                for particle_i_1 in cell.particleIndexes:
+                    for surroundingCell_i in cell.neighborIndexes:
+                        surroundingCell = cells[surroundingCell_i]
+                        for particle_i_2 in surroundingCell.particleIndexes:
+                            if particle_i_1 != particle_i_2:
+                                particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2] = seperateTwoParticles(particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2])
+    timer = time.time() - timer
+
+    #convert back from numpy arrays to classes
+    for index, particle in enumerate(particles):
+        particle.xPos = particle_xPos[index]
+        particle.yPos = particle_yPos[index]
+    return timer
 
 
-def seperateTwoParticles(particle_1, particle_2):
-    if particle_1 == particle_2:
-        return
 
+def seperateTwoParticles(x_1, y_1, x_2, y_2):
     #get distance between particles
-    dx = particle_2.xPos - particle_1.xPos
-    dy = particle_2.yPos - particle_1.yPos
+    dx = x_2 - x_1
+    dy = y_2 - y_1
     distance = math.sqrt(dx**2 + dy**2)
 
     #if overlaping, move apart
@@ -330,15 +383,17 @@ def seperateTwoParticles(particle_1, particle_2):
         move_y = overlap * math.sin(angle) / 2
         
         #move particles
-        particle_1.xPos = clamp(particle_1.xPos - move_x, 0, maxX)
-        particle_1.yPos = clamp(particle_1.yPos - move_y, 0, maxY)
-        particle_2.xPos = clamp(particle_2.xPos + move_x, 0, maxX)
-        particle_2.yPos = clamp(particle_2.yPos + move_y, 0, maxY)
+        x_1 = clamp(x_1 - move_x, 0, maxX)
+        y_1 = clamp(y_1 - move_y, 0, maxY)
+        x_2 = clamp(x_2 + move_x, 0, maxX)
+        y_2 = clamp(y_2 + move_y, 0, maxY)
+
+    return x_1, y_1, x_2, y_2
 
 
 ### settings
 #other
-gravity = 50
+gravity = 75
 stiffness = 0
 averageDensity = 200
 overrelaxation = 1.5
@@ -356,9 +411,9 @@ draw_edge_vels = False
 screenHeight = screenWidth #just leave this, its annoying
 
 #particles
-particleCount = 100
+particleCount = 500
 particleRadius = 3
-maxParticleItterations = 2
+maxParticleItterations = 5
 minParticleDistance = particleRadius * 2
 particleMinDistance = particleRadius * 2
 maxX = screenWidth/scale - .0001
@@ -413,7 +468,10 @@ while True:
     ### particle stuff:
     addVelocity(0, gravity * dt) #apply gravity
     moveParticles(dt)
-    seperateParticles(maxParticleItterations)
+
+    timer = seperateParticles(maxParticleItterations)
+    #print(timer/dt)
+
     #pushParticlesOutOfObstacles()
 
 
