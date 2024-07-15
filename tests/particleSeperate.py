@@ -12,8 +12,8 @@ def clamp(value, minValue, maxValue):
 
 class Particle():
     def __init__(self, xVel = None, yVel = None, xPos = None, yPos = None):
-        self.xVel = xVel if xVel is not None else random.random() - .5
-        self.yVel = yVel if yVel is not None else random.random() - .5
+        self.xVel = (xVel if xVel is not None else random.random() - .5) * .5
+        self.yVel = (yVel if yVel is not None else random.random() - .5) * .5
         self.xPos = xPos if xPos is not None else random.random()
         self.yPos = yPos if yPos is not None else random.random()
 
@@ -152,7 +152,7 @@ def waitForPress():
 def drawAll():
     screen.fill((100, 100, 100))
 
-    #grid.draw()
+    grid.draw()
 
     for particle in particles:
         particle.draw(particleRadius)
