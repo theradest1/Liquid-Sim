@@ -56,7 +56,7 @@ class Particle:
             self.yVel = 0
     
     def draw(self, scale, color):
-        pygame.draw.circle(screen, color, (self.xPos * scale + screenPadding, self.yPos * scale), scale * particleRadius)
+        pygame.draw.circle(screen, color, (self.xPos * scale + screenPadding, self.yPos * scale + screenPadding), scale * particleRadius)
         
 
 #references to other data (like corners  or edges)
@@ -107,6 +107,7 @@ class Cell:
 
     def updateDensity(self):
         if self.isAir:
+            self.density = 0
             return
         
         self.density = self.edge_right.weight + self.edge_left.weight + self.edge_top.weight + self.edge_bottom.weight
@@ -291,6 +292,10 @@ def drawInfo():
     particles_string = "Particles: " + str(len(particles))
     textToScreen(particles_string, (0, 0, 0), (1, 1 * spacing))
 
+    #seperation of particles
+    seperation_string = "Comparisons: " + str(comparisons)
+    textToScreen(seperation_string, (0, 0, 0), (1, 2 * spacing))
+
 
 def addVelocity(xVel, yVel):
     for particle in particles:
@@ -308,6 +313,8 @@ class seperationCell:
 
 #this uses numpy arrays since they are significantly faster
 def seperateParticles(maxIterations):
+    global comparisons
+
     cellSize = particleRadius * 2
     gridWidth = math.ceil(screenWidth/scale/cellSize)
     gridHeight = math.ceil(screenHeight/scale/cellSize)
@@ -333,7 +340,6 @@ def seperateParticles(maxIterations):
         particle_yPos[index] = particle.yPos
 
     #seperate particles
-    timer = time.time()
     for i in range(maxIterations):
         #clear past particles
         for cell in cells:
@@ -353,14 +359,13 @@ def seperateParticles(maxIterations):
                         surroundingCell = cells[surroundingCell_i]
                         for particle_i_2 in surroundingCell.particleIndexes:
                             if particle_i_1 != particle_i_2:
+                                comparisons += 1
                                 particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2] = seperateTwoParticles(particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2])
-    timer = time.time() - timer
 
     #convert back from numpy arrays to classes
     for index, particle in enumerate(particles):
         particle.xPos = particle_xPos[index]
         particle.yPos = particle_yPos[index]
-    return timer
 
 
 
@@ -393,16 +398,16 @@ def seperateTwoParticles(x_1, y_1, x_2, y_2):
 
 ### settings
 #other
-gravity = 75
+gravity = 100
 stiffness = 0
-averageDensity = 200
-overrelaxation = 1.5
+averageDensity = 0
+overrelaxation = 1.7
 
 #visuals
-scale = 2.5
+scale = 3
 maxFps = 30
-screenWidth = 700
-screenPadding = 3 #should be the radius of the particles
+screenWidth = 1000
+screenPadding = 3 * scale #should be the radius of the particles * scale
 draw_particles = True
 draw_grid = False
 draw_grid_colors = False
@@ -413,14 +418,13 @@ screenHeight = screenWidth #just leave this, its annoying
 #particles
 particleCount = 500
 particleRadius = 3
-maxParticleItterations = 5
+maxParticleItterations = 3
 minParticleDistance = particleRadius * 2
-particleMinDistance = particleRadius * 2
 maxX = screenWidth/scale - .0001
 maxY = screenHeight/scale - .0001
 
 #grid
-gridItterations = 2
+gridItterations = 3
 targetCellSize = particleRadius * 3
 gridWidth = math.floor(screenWidth/scale/targetCellSize)
 gridHeight = math.floor(screenHeight/scale/targetCellSize)
@@ -469,8 +473,8 @@ while True:
     addVelocity(0, gravity * dt) #apply gravity
     moveParticles(dt)
 
-    timer = seperateParticles(maxParticleItterations)
-    #print(timer/dt)
+    comparisons = 0
+    seperateParticles(maxParticleItterations)
 
     #pushParticlesOutOfObstacles()
 
@@ -497,4 +501,4 @@ while True:
     pygame.display.flip()
 
     #lock to fps
-    clock.tick(maxFps)
+    #clock.tick(maxFps)
