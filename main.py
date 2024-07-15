@@ -252,14 +252,12 @@ def gridToParticles():
     for edge_row in grid.verticalEdges:
         for edge in edge_row:
             if edge.weight != 0:
-                pass
-                # edge.velocity /= edge.weight
+                edge.velocity /= edge.weight
 
     for edge_row in grid.horizontalEdges:
         for edge in edge_row:
             if edge.weight != 0:
-                pass
-                #edge.velocity /= edge.weight
+                edge.velocity /= edge.weight
 
     #loop through cells
     for cell_row in grid.cells:
@@ -321,9 +319,9 @@ def seperateTwoParticles(particle_1, particle_2):
 
 #info
 gravity = 50
-gridWidth = 8
-gridHeight = 8
-cellSize = 50
+gridWidth = 12
+gridHeight = 12
+cellSize = 25
 
 gridItterations = 1
 
@@ -398,7 +396,7 @@ while True:
     # make incompressible
     #solveGrid(gridItterations, overrelaxation)
     # grid to particles
-    #gridToParticles()
+    gridToParticles()
 
     ### visuals:
     screen.fill((100, 100, 100))
