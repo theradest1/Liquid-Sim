@@ -405,7 +405,7 @@ overrelaxation = 1.7
 
 #visuals
 scale = 3
-maxFps = 30
+maxFps = 0 #0 for no max
 screenWidth = 1000
 screenPadding = 3 * scale #should be the radius of the particles * scale
 draw_particles = True
@@ -416,7 +416,7 @@ draw_edge_vels = False
 screenHeight = screenWidth #just leave this, its annoying
 
 #particles
-particleCount = 500
+particleCount = 600
 particleRadius = 3
 maxParticleItterations = 3
 minParticleDistance = particleRadius * 2
@@ -501,4 +501,5 @@ while True:
     pygame.display.flip()
 
     #lock to fps
-    #clock.tick(maxFps)
+    if maxFps != 0:
+        clock.tick(maxFps)
