@@ -93,10 +93,10 @@ class Cell:
 
         #print(f"Left: {particle.weight_left}, Right: {particle.weight_right}, Top: {particle.weight_top}, Bottom: {particle.weight_bottom}")
 
-        self.edge_left.velocity += particle.xVel * particle.weight_left
-        self.edge_right.velocity += particle.xVel * particle.weight_right
-        self.edge_top.velocity += particle.yVel * particle.weight_top
-        self.edge_bottom.velocity += particle.yVel * particle.weight_bottom
+        self.edge_left.velocity += particle.xVel * particle.weight_left * self.edge_left.openEdge
+        self.edge_right.velocity += particle.xVel * particle.weight_right * self.edge_right.openEdge
+        self.edge_top.velocity += particle.yVel * particle.weight_top * self.edge_top.openEdge
+        self.edge_bottom.velocity += particle.yVel * particle.weight_bottom * self.edge_bottom.openEdge
 
         #edge = particle * weight
         #particle = edge / weight
@@ -123,7 +123,11 @@ class Cell:
     #for incompressibility
     def solve(self, overrelaxation):
         openEdges = self.edge_bottom.openEdge + self.edge_top.openEdge + self.edge_left.openEdge + self.edge_right.openEdge
-        divergence = overrelaxation * (-self.edge_right.velocity + self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity)# - stiffness * (self.density - averageDensity)
+        
+        pressureDivergence = stiffness * (self.density - averageDensity)
+        pressureDivergence = clamp(pressureDivergence, 0, abs(pressureDivergence))
+        
+        divergence = overrelaxation * (-self.edge_right.velocity + self.edge_left.velocity + self.edge_top.velocity - self.edge_bottom.velocity) - pressureDivergence
         splitDivergence = divergence/openEdges
 
         self.edge_right.velocity += splitDivergence * self.edge_right.openEdge
@@ -135,10 +139,13 @@ class Cell:
 
 class Edge:
     def __init__(self):
-        self.reset()
         self.openEdge = 1
+        self.reset()
 
     def reset(self):
+        if self.openEdge == 0:
+            return
+
         self.velocity = 0
         self.weight = 0
     
@@ -317,40 +324,43 @@ def seperateTwoParticles(particle_1, particle_2):
         particle_2.yPos = clamp(particle_2.yPos + move_y, 0, maxY)
 
 
-#info
+###info
+#other
 gravity = 50
-gridWidth = 12
-gridHeight = 12
-cellSize = 25
-
-gridItterations = 1
-
-particleCount = 100
-particleRadius = 5
-minParticleDistance = particleRadius * 2
-
-stiffness = 1
-averageDensity = 15
-
-#seperationGridCellSize = particleRadius * 2
-#seperationGridXCount = 
-maxParticleItterations = 5
+stiffness = .5
+averageDensity = 200
 overrelaxation = 1
+
+#visuals
+scale = 2.5
+screenWidth = 700
+screenHeight = 700
+
+#particles
+particleCount = 500
+particleRadius = 3
+minParticleDistance = particleRadius * 2
+maxParticleItterations = 5
 particleMinDistance = particleRadius*2
-scale = 2.3 #for visuals
+maxX = screenWidth/scale - .0001
+maxY = screenHeight/scale - .0001
 
-#particle bounds
-maxX = gridWidth * cellSize - .01
-maxY = gridHeight * cellSize - .01
+#grid
+gridItterations = 2
+targetCellSize = particleRadius * 5
+gridWidth = int(screenWidth/scale/targetCellSize)
+gridHeight = int(screenHeight/scale/targetCellSize)
+cellSize = screenWidth/scale/gridWidth
 
-dt = 0
-lastFrameTime = time.time()
+screenHeight -= cellSize - screenHeight/scale/gridHeight
+print(screenHeight)
 
+if cellSize != screenHeight/scale/gridHeight:
+    print("Please choose a valid screen height and width")
+    exit()
 
 #start display
 pygame.init()
-screenWidth = gridWidth * cellSize * scale
-screenHeight = gridHeight * cellSize * scale
 screen = pygame.display.set_mode((screenWidth, screenHeight))
 pygame.display.set_caption("PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
@@ -362,7 +372,10 @@ for i in range(particleCount):
 
 grid = Grid(cellSize, gridWidth, gridHeight)
 
+#start time keeping stuffs
 clock = pygame.time.Clock()
+dt = 0
+lastFrameTime = time.time()
 
 #simulation loop
 while True:
@@ -391,10 +404,13 @@ while True:
     ### grid stuff:
     # particles to grid
     particlesToGrid()
-    #to push particles apart
-    #updateDensity()
+    
+    #to push particles apart when in clumps
+    updateDensity()
+    
     # make incompressible
-    #solveGrid(gridItterations, overrelaxation)
+    solveGrid(gridItterations, overrelaxation)
+    
     # grid to particles
     gridToParticles()
 
