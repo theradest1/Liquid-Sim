@@ -398,10 +398,10 @@ def seperateTwoParticles(x_1, y_1, x_2, y_2):
 
 ### settings
 #other
-gravity = 100
+gravity = 75
 stiffness = 0
 averageDensity = 0
-overrelaxation = 1.7
+overrelaxation = 1.8
 
 #visuals
 scale = 3
@@ -449,12 +449,12 @@ particles = []
 for i in range(particleCount):
     particles.append(Particle(cellSize * gridWidth/2, cellSize * gridHeight/2))
 
+waitForInteraction()
 
 #start time keeping stuffs
 clock = pygame.time.Clock()
 dt = 0
 lastFrameTime = time.time()
-
 
 #simulation loop
 while True:
@@ -467,7 +467,6 @@ while True:
     #get dt (for frame independance)
     dt = time.time() - lastFrameTime
     lastFrameTime = time.time()
-
 
     ### particle stuff:
     addVelocity(0, gravity * dt) #apply gravity
@@ -483,8 +482,6 @@ while True:
     particlesToGrid()
     updateDensity() #to push particles apart when in clumps
     solveGrid(gridItterations, overrelaxation) # make incompressible
-
-
     gridToParticles() # grid to particles
 
     ### visuals:
