@@ -341,7 +341,6 @@ def seperateParticles(maxIterations):
         particle_xPos[index] = particle.xPos
         particle_yPos[index] = particle.yPos
 
-    #seperate particles
     for i in range(maxIterations):
         #clear past particles
         for cell in cells:
@@ -356,14 +355,16 @@ def seperateParticles(maxIterations):
         for cell_y in range(0, gridHeight):
             for cell_x in range(0, gridWidth):
                 cell = cells[cell_y * gridWidth + cell_x]
-                for particle_i_1 in cell.particleIndexes:
+                for particle_i_1_i in range(len(cell.particleIndexes)):
+                    particle_i_1 = cell.particleIndexes[particle_i_1_i]
                     for surroundingCell_i in cell.neighborIndexes:
                         surroundingCell = cells[surroundingCell_i]
                         for particle_i_2 in surroundingCell.particleIndexes:
-                            if particle_i_1 != particle_i_2:
+                            if particle_i_1 != particle_i_2 and particle_i_2 is not None:
                                 comparisons += 1
                                 particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2] = seperateTwoParticles(particle_xPos[particle_i_1], particle_yPos[particle_i_1], particle_xPos[particle_i_2], particle_yPos[particle_i_2])
-
+                    #get rid of since it has been checked against everything nearby
+                    cell.particleIndexes[particle_i_1_i] = None
     #convert back from numpy arrays to classes
     for index, particle in enumerate(particles):
         particle.xPos = particle_xPos[index]
@@ -423,14 +424,14 @@ stiffness = 0
 averageDensity = 0
 overrelaxation = 1.8
 
-particleRadius = 5 #this was moved here because it is used in other things
+particleRadius = 3 #this was moved here because it is used in other things
 
 #visuals
-scale = 2
+scale = 3
 maxFps = 0 #0 for no max
-simulationSpeed = 2.5 #1 for normal
+simulationSpeed = 2.5 #1 is not realtime, it is just an arbitrary value (like the gravity)
 framerateIndependant = True #if true, it will set dt to simulationSpeed
-screenWidth = 1700
+screenWidth = 1500
 screenHeight = 800
 screenPadding = particleRadius * scale
 draw_particles = True
@@ -438,11 +439,11 @@ draw_grid = False
 draw_grid_colors = False
 draw_edges = False
 draw_edge_vels = False
-draw_mouse = True
+draw_mouse = False
 
 #interaction
-mousePower = 10 * scale
-mouseRadius = 10 * scale
+mousePower = 5 * scale
+mouseRadius = 10
 
 #grid
 gridItterations = 3
@@ -458,7 +459,7 @@ if difference != 0:
     print("Screen height was adjusted to", screenHeight, "to fit cells better")
 
 #particles
-particleCount = 600
+particleCount = 800
 maxParticleItterations = 5
 minParticleDistance = particleRadius * 2
 clampFudge = .001 #so rounding does mess things up
@@ -481,8 +482,8 @@ grid = Grid(cellSize, gridHeight, gridWidth)
 
 particles = []
 for i in range(int(particleCount/2)):
-    particles.append(Particle(0, maxY*2/4, maxX/4, maxY*3/4))
-    particles.append(Particle(maxX*3/4, maxY*2/4, maxX, maxY*3/4))
+    particles.append(Particle(0, maxY*2/4, maxX/3, maxY*3/4))
+    particles.append(Particle(maxX*2/3, maxY*2/4, maxX, maxY*3/4))
 
     #particles.append(Particle(0, maxY/2, maxX/2, maxY))
 
@@ -528,7 +529,7 @@ while True:
     #draw things
     grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
     if draw_mouse:
-        pygame.draw.circle(screen, (100, 100, 100), (mouseX, mouseY), mouseRadius)
+        pygame.draw.circle(screen, (100, 100, 100), (mouseX, mouseY), mouseRadius * scale)
     if draw_particles: 
         drawParticles(scale)
     
