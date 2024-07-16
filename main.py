@@ -436,6 +436,7 @@ def drawAll():
         clock.tick(maxFps)
         
 def checkInteractions():
+    global timeDiff, lastFrameTime
     #check interaction events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -487,8 +488,8 @@ if difference != 0:
     print("Screen height was adjusted to", screenHeight, "to fit cells better")
 
 #particles
-particleCount = 800
-maxParticleItterations = 6
+particleCount = 700
+maxParticleItterations = 5
 minParticleDistance = particleRadius * 2
 clampFudge = .001 #so rounding doesn't mess things up
 maxX = screenWidth/scale - clampFudge
