@@ -49,12 +49,12 @@ class Particle:
     def move(self, dt):
         self.xPos += self.xVel * dt
         if self.xPos >= maxX or self.xPos <= 0:
-            self.xPos = clamp(self.xPos, 0, maxX)
+            self.xPos = clamp(self.xPos, minX, maxX)
             self.xVel = 0
 
         self.yPos += self.yVel * dt
         if self.yPos >= maxY or self.yPos <= 0:
-            self.yPos = clamp(self.yPos, 0, maxY)
+            self.yPos = clamp(self.yPos, minY, maxY)
             self.yVel = 0
     
     def draw(self, scale, color):
@@ -238,7 +238,7 @@ def particlesToGrid():
     for particle in particles:
         cellX = math.floor(particle.xPos/grid.cellSize)
         cellY = math.floor(particle.yPos/grid.cellSize)
-        
+
         cell = grid.cells[cellY][cellX]
         cell.addParticle(particle)
 
@@ -329,7 +329,7 @@ def seperateParticles(maxIterations):
                 for dx in range(-1, 2):
                     neighborY = y + dy
                     neighborX = x + dx
-                    if neighborY >= 0 and neighborY < gridHeight and neighborX >= 0 and neighborX < gridHeight:
+                    if neighborY >= 0 and neighborY < gridHeight and neighborX >= 0 and neighborX < gridWidth:
                         cells[y * gridWidth + x].neighborIndexes.append(neighborY * gridWidth + neighborX)
 
     #convert from particle class to arrays
@@ -389,10 +389,10 @@ def seperateTwoParticles(x_1, y_1, x_2, y_2):
         move_y = overlap * math.sin(angle) / 2
         
         #move particles
-        x_1 = clamp(x_1 - move_x, 0, maxX)
-        y_1 = clamp(y_1 - move_y, 0, maxY)
-        x_2 = clamp(x_2 + move_x, 0, maxX)
-        y_2 = clamp(y_2 + move_y, 0, maxY)
+        x_1 = clamp(x_1 - move_x, minX, maxX)
+        y_1 = clamp(y_1 - move_y, minY, maxY)
+        x_2 = clamp(x_2 + move_x, minX, maxX)
+        y_2 = clamp(y_2 + move_y, minY, maxY)
 
     return x_1, y_1, x_2, y_2
 
@@ -412,20 +412,13 @@ maxFps = 0 #0 for no max
 simulationSpeed = 2.5 #1 for normal
 framerateIndependant = True #if true, it will set dt to simulationSpeed
 screenWidth = 1000
+screenHeight = 500
 screenPadding = particleRadius * scale
 draw_particles = True
 draw_grid = False
 draw_grid_colors = False
 draw_edges = False
 draw_edge_vels = False
-screenHeight = screenWidth #just leave this, its annoying
-
-#particles
-particleCount = 400
-maxParticleItterations = 5
-minParticleDistance = particleRadius * 2
-maxX = screenWidth/scale - .0001
-maxY = screenHeight/scale - .0001
 
 #grid
 gridItterations = 3
@@ -434,11 +427,22 @@ gridWidth = math.floor(screenWidth/scale/targetCellSize)
 gridHeight = math.floor(screenHeight/scale/targetCellSize)
 cellSize = screenWidth/scale/gridWidth
 
-#fix screen height to fit better (to be square)
+#fix screen height to fit better (so cells are square)
 difference = screenHeight - gridHeight * cellSize * scale
 if difference != 0:
     screenHeight -= difference
     print("Screen height was adjusted to", screenHeight, "to fit cells better")
+
+#particles
+particleCount = 400
+maxParticleItterations = 5
+minParticleDistance = particleRadius * 2
+clampFudge = .001 #so rounding does mess things up
+maxX = screenWidth/scale - clampFudge
+maxY = screenHeight/scale - clampFudge
+minX = clampFudge
+minY = clampFudge
+
 
 #initialize display
 pygame.init()
@@ -447,7 +451,7 @@ pygame.display.set_caption("PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
 
 #initialize data
-grid = Grid(cellSize, gridWidth, gridHeight)
+grid = Grid(cellSize, gridHeight, gridWidth)
 
 particles = []
 for i in range(int(particleCount/2)):
