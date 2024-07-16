@@ -415,7 +415,35 @@ def mouseInteraction():
             particle.xVel -= mouseDx * mousePower / particleDistance
             particle.yVel -= mouseDy * mousePower / particleDistance
 
+def drawAll():
+    ### visuals:
+    screen.fill((0, 0, 0)) #clear
 
+    #draw things
+    grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
+    if draw_mouse:
+        pygame.draw.circle(screen, (100, 100, 100), (mouseX, mouseY), mouseRadius * scale)
+    if draw_particles: 
+        drawParticles(scale)
+    
+    drawInfo()
+
+    #update screen
+    pygame.display.flip()
+
+    #lock to fps
+    if maxFps != 0:
+        clock.tick(maxFps)
+        
+def checkInteractions():
+    #check interaction events
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            timeDiff = time.time() - lastFrameTime
+            waitForInteraction()
+            lastFrameTime = time.time() - timeDiff
 
 ### settings
 #other
@@ -431,15 +459,15 @@ scale = 3
 maxFps = 0 #0 for no max
 simulationSpeed = 2.5 #1 is not realtime, it is just an arbitrary value (like the gravity)
 framerateIndependant = True #if true, it will set dt to simulationSpeed
-screenWidth = 1700
-screenHeight = 800
+screenWidth = 1800
+screenHeight = 900
 screenPadding = particleRadius * scale
 draw_particles = True
 draw_grid = False
 draw_grid_colors = False
 draw_edges = False
 draw_edge_vels = False
-draw_mouse = False
+draw_mouse = True
 
 #interaction
 mousePower = 5 * scale
@@ -460,14 +488,13 @@ if difference != 0:
 
 #particles
 particleCount = 800
-maxParticleItterations = 5
+maxParticleItterations = 6
 minParticleDistance = particleRadius * 2
-clampFudge = .001 #so rounding does not mess things up
+clampFudge = .001 #so rounding doesn't mess things up
 maxX = screenWidth/scale - clampFudge
 maxY = screenHeight/scale - clampFudge
 minX = clampFudge
 minY = clampFudge
-
 
 #initialize display
 pygame.init()
@@ -487,6 +514,11 @@ for i in range(int(particleCount/2)):
 
     #particles.append(Particle(0, maxY/2, maxX/2, maxY))
 
+comparisons = 0
+seperateParticles(10)
+drawParticles(scale)
+pygame.display.flip()
+
 waitForInteraction()
 
 #start time keeping stuffs
@@ -496,14 +528,7 @@ lastFrameTime = time.time()
 
 #simulation loop
 while True:
-    #check interaction events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            timeDiff = time.time() - lastFrameTime
-            waitForInteraction()
-            lastFrameTime = time.time() - timeDiff
+    checkInteractions()
 
     #get dt (for frame independance)
     dt = time.time() - lastFrameTime
@@ -512,8 +537,9 @@ while True:
 
     ### particle stuff:
     moveParticles(dt)
-    addVelocity(0, gravity * dt) #apply gravity
-    mouseInteraction() # here because the grid already has nearby particles
+    addVelocity(0, gravity * dt) #add gravity
+    mouseInteraction()
+    
     comparisons = 0
     seperateParticles(maxParticleItterations)
 
@@ -523,21 +549,4 @@ while True:
     solveGrid(gridItterations, overrelaxation) # make incompressible
     gridToParticles() # grid to particles
 
-    ### visuals:
-    screen.fill((0, 0, 0)) #clear
-
-    #draw things
-    grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
-    if draw_mouse:
-        pygame.draw.circle(screen, (100, 100, 100), (mouseX, mouseY), mouseRadius * scale)
-    if draw_particles: 
-        drawParticles(scale)
-    
-    drawInfo()
-
-    #update screen
-    pygame.display.flip()
-
-    #lock to fps
-    if maxFps != 0:
-        clock.tick(maxFps)
+    drawAll()
