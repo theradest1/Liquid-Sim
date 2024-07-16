@@ -118,24 +118,30 @@ def seperateTwoParticles(particle_1, particle_2):
         particle_2.yPos = clamp(particle_2.yPos + move_y, 0.001, .999)
 
 def seperateParticles():
-    #setup
-    grid.clear()
-    for particle in particles:
-        grid.addParticle(particle)
+    global comparisons
 
-    for y in range(0, len(grid.cells), 2):
-        for x in range(0, len(grid.cells[y]), 2):
-            cell = grid.cells[y, x]
-            cellParticles = cell.getParticles()
-            for particle_1 in cellParticles:
-                for particle_2 in cellParticles:
-                    if particle_1 != particle_2:
-                        seperateTwoParticles(particle_1, particle_2)
+    if not badVersion:
+        #setup
+        grid.clear()
+        for particle in particles:
+            grid.addParticle(particle)
 
-    """for particle_1 in particles:
-        for particle_2 in particles:
-            if particle_1 != particle_2:
-                seperateTwoParticles(particle_1, particle_2)"""
+        for y in range(0, len(grid.cells), 2):
+            for x in range(0, len(grid.cells[y]), 2):
+                cell = grid.cells[y, x]
+                cellParticles = cell.getParticles()
+                for particle_1 in cellParticles:
+                    for particle_2 in cellParticles:
+                        if particle_1 != particle_2:
+                            comparisons += 1
+                            seperateTwoParticles(particle_1, particle_2)
+
+    else:
+        for particle_1 in particles:
+            for particle_2 in particles:
+                if particle_1 != particle_2:
+                    comparisons += 1
+                    seperateTwoParticles(particle_1, particle_2)
 
 
 def waitForPress():
@@ -152,10 +158,17 @@ def waitForPress():
 def drawAll():
     screen.fill((100, 100, 100))
 
-    grid.draw()
+    if not badVersion:
+        grid.draw()
+    else:
+        rect = pygame.Rect(padding, padding, scale, scale)
+        pygame.draw.rect(screen, (255, 255, 255), rect, 1)
 
     for particle in particles:
         particle.draw(particleRadius)
+
+    textToScreen(f"Type: {"Particle by particle" if badVersion else "Cell based"}", (0, 0, 0), (1, 1))
+    textToScreen(f"Comparisons: {comparisons}", (0, 0, 0), (1, 21))
 
     pygame.display.flip()
 
@@ -166,9 +179,10 @@ cellsInRow = int(1/(particleRadius*2))
 grid = Grid(cellsInRow, cellsInRow)
 cellSize = 1/cellsInRow
 maxIterations = 5
-particles = 400
-scale = 600 #only visual
+particles = 200
+scale = 800 #only visual
 padding = 50 #only visual
+badVersion = True
 
 pygame.init()
 screen = pygame.display.set_mode((scale + padding * 2, scale + padding * 2))
@@ -178,18 +192,22 @@ font = pygame.font.Font(None, 36)
 particles = np.array([Particle() for _ in range(particles)])
 
 #show
+comparisons = 0
 drawAll()
 waitForPress()
 
 #game loop
 startFrame = time.time()
 while True:
+    comparisons = 0
     dt = time.time() - startFrame
     startFrame = time.time()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            badVersion = not badVersion
 
     for particle in particles:
         particle.move(dt)
@@ -199,7 +217,8 @@ while True:
     for i in range(maxIterations):
         seperateParticles()
 
-    print(f"Iterations: {i}, Time: {time.time() - startFrame}")
+    #print(f"Iterations: {i}, Time: {time.time() - startFrame}")
+
     drawAll()
 
 exit()
