@@ -284,19 +284,20 @@ def drawParticles(scale):
 
 
 def drawInfo():
-    spacing = 20
+    spacing = 18
+    color = (255, 255, 255)
 
     #fps
     fps_string = "FPS: " + ("Infinite" if dt == 0 else str(round(simulationSpeed/dt)))
-    textToScreen(fps_string, (0, 0, 0), (1, 1))
+    textToScreen(fps_string, color, (1, 1))
 
     #particles
     particles_string = "Particles: " + str(len(particles))
-    textToScreen(particles_string, (0, 0, 0), (1, 1 * spacing))
+    textToScreen(particles_string, color, (1, 1 * spacing))
 
     #seperation of particles
     seperation_string = "Comparisons: " + str(comparisons)
-    textToScreen(seperation_string, (0, 0, 0), (1, 2 * spacing))
+    textToScreen(seperation_string, color, (1, 2 * spacing))
 
 
 def addVelocity(xVel, yVel):
@@ -396,6 +397,24 @@ def seperateTwoParticles(x_1, y_1, x_2, y_2):
 
     return x_1, y_1, x_2, y_2
 
+def mouseInteraction():
+    global mouseX, mouseY, mousePrevX, mousePrevY
+
+    mouseX, mouseY = pygame.mouse.get_pos()
+
+    mouseDx = mousePrevX - mouseX
+    mouseDy = mousePrevY - mouseY
+    
+    mousePrevX = mouseX
+    mousePrevY = mouseY
+
+    for particle in particles:
+        particleDistance = math.sqrt((particle.xPos - mouseX/scale)**2 + (particle.yPos - mouseY/scale)**2)
+        if particleDistance < mouseRadius:
+            particle.xVel -= mouseDx * mousePower / particleDistance
+            particle.yVel -= mouseDy * mousePower / particleDistance
+
+
 
 ### settings
 #other
@@ -407,18 +426,23 @@ overrelaxation = 1.8
 particleRadius = 5 #this was moved here because it is used in other things
 
 #visuals
-scale = 1.9
+scale = 2
 maxFps = 0 #0 for no max
 simulationSpeed = 2.5 #1 for normal
 framerateIndependant = True #if true, it will set dt to simulationSpeed
-screenWidth = 1000
-screenHeight = 500
+screenWidth = 1700
+screenHeight = 800
 screenPadding = particleRadius * scale
 draw_particles = True
 draw_grid = False
 draw_grid_colors = False
 draw_edges = False
 draw_edge_vels = False
+draw_mouse = True
+
+#interaction
+mousePower = 10 * scale
+mouseRadius = 10 * scale
 
 #grid
 gridItterations = 3
@@ -434,7 +458,7 @@ if difference != 0:
     print("Screen height was adjusted to", screenHeight, "to fit cells better")
 
 #particles
-particleCount = 400
+particleCount = 600
 maxParticleItterations = 5
 minParticleDistance = particleRadius * 2
 clampFudge = .001 #so rounding does mess things up
@@ -451,6 +475,8 @@ pygame.display.set_caption("PIC Fluid simulation")
 font = pygame.font.Font(None, 36)
 
 #initialize data
+mousePrevX, mousePrevY = pygame.mouse.get_pos()
+
 grid = Grid(cellSize, gridHeight, gridWidth)
 
 particles = []
@@ -478,8 +504,6 @@ while True:
             waitForInteraction()
             lastFrameTime = time.time() - timeDiff
 
-
-
     #get dt (for frame independance)
     dt = time.time() - lastFrameTime
     dt = dt * simulationSpeed if framerateIndependant else simulationSpeed
@@ -488,12 +512,9 @@ while True:
     ### particle stuff:
     moveParticles(dt)
     addVelocity(0, gravity * dt) #apply gravity
-
+    mouseInteraction() # here because the grid already has nearby particles
     comparisons = 0
     seperateParticles(maxParticleItterations)
-
-    #pushParticlesOutOfObstacles()
-    
 
     ### grid stuff:
     particlesToGrid()
@@ -502,10 +523,12 @@ while True:
     gridToParticles() # grid to particles
 
     ### visuals:
-    screen.fill((255, 255, 255)) #clear
+    screen.fill((0, 0, 0)) #clear
 
     #draw things
     grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
+    if draw_mouse:
+        pygame.draw.circle(screen, (100, 100, 100), (mouseX, mouseY), mouseRadius)
     if draw_particles: 
         drawParticles(scale)
     
