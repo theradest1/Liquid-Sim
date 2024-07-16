@@ -14,8 +14,6 @@ def waitForInteraction():
                 exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 return
-            elif event.type == pygame.KEYDOWN:
-                return
 
 def normalize_tuple(t):
     # Calculate the Euclidean norm of the tuple
@@ -34,9 +32,13 @@ def clamp(value, minValue, maxValue):
 
 
 class Particle:
-    def __init__(self, xBound, yBound):
-        self.xPos = random.random() * xBound
-        self.yPos = random.random() * yBound
+    def __init__(self, xMinBound, yMinBound, xMaxBound, yMaxBound):
+        width = xMaxBound - xMinBound
+        height = yMaxBound - yMinBound
+
+        self.xPos = random.random() * width + xMinBound
+        self.yPos = random.random() * height + yMinBound
+
         self.xVel = 0
         self.yVel = 0
     
@@ -285,7 +287,7 @@ def drawInfo():
     spacing = 20
 
     #fps
-    fps_string = "FPS: " + ("Infinite" if dt == 0 else str(round(1/dt)))
+    fps_string = "FPS: " + ("Infinite" if dt == 0 else str(round(simulationSpeed/dt)))
     textToScreen(fps_string, (0, 0, 0), (1, 1))
 
     #particles
@@ -300,7 +302,6 @@ def drawInfo():
 def addVelocity(xVel, yVel):
     for particle in particles:
         particle.addVel(xVel, yVel)
-
 
 def moveParticles(dt):
     for particle in particles:
@@ -398,16 +399,20 @@ def seperateTwoParticles(x_1, y_1, x_2, y_2):
 
 ### settings
 #other
-gravity = 75
+gravity = 50
 stiffness = 0
 averageDensity = 0
 overrelaxation = 1.8
 
+particleRadius = 5 #this was moved here because it is used in other things
+
 #visuals
-scale = 3
+scale = 1.9
 maxFps = 0 #0 for no max
+simulationSpeed = 2.5 #1 for normal
+framerateIndependant = True #if true, it will set dt to simulationSpeed
 screenWidth = 1000
-screenPadding = 3 * scale #should be the radius of the particles * scale
+screenPadding = particleRadius * scale
 draw_particles = True
 draw_grid = False
 draw_grid_colors = False
@@ -416,9 +421,8 @@ draw_edge_vels = False
 screenHeight = screenWidth #just leave this, its annoying
 
 #particles
-particleCount = 600
-particleRadius = 3
-maxParticleItterations = 3
+particleCount = 400
+maxParticleItterations = 5
 minParticleDistance = particleRadius * 2
 maxX = screenWidth/scale - .0001
 maxY = screenHeight/scale - .0001
@@ -446,8 +450,11 @@ font = pygame.font.Font(None, 36)
 grid = Grid(cellSize, gridWidth, gridHeight)
 
 particles = []
-for i in range(particleCount):
-    particles.append(Particle(cellSize * gridWidth/2, cellSize * gridHeight/2))
+for i in range(int(particleCount/2)):
+    particles.append(Particle(0, maxY*2/4, maxX/4, maxY*3/4))
+    particles.append(Particle(maxX*3/4, maxY*2/4, maxX, maxY*3/4))
+
+    #particles.append(Particle(0, maxY/2, maxX/2, maxY))
 
 waitForInteraction()
 
@@ -462,21 +469,27 @@ while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            timeDiff = time.time() - lastFrameTime
+            waitForInteraction()
+            lastFrameTime = time.time() - timeDiff
+
 
 
     #get dt (for frame independance)
     dt = time.time() - lastFrameTime
+    dt = dt * simulationSpeed if framerateIndependant else simulationSpeed
     lastFrameTime = time.time()
 
     ### particle stuff:
-    addVelocity(0, gravity * dt) #apply gravity
     moveParticles(dt)
+    addVelocity(0, gravity * dt) #apply gravity
 
     comparisons = 0
     seperateParticles(maxParticleItterations)
 
     #pushParticlesOutOfObstacles()
-
+    
 
     ### grid stuff:
     particlesToGrid()
@@ -485,7 +498,7 @@ while True:
     gridToParticles() # grid to particles
 
     ### visuals:
-    screen.fill((100, 100, 100)) #clear
+    screen.fill((255, 255, 255)) #clear
 
     #draw things
     grid.draw(scale, draw_grid, draw_grid_colors, draw_edges, draw_edge_vels)
